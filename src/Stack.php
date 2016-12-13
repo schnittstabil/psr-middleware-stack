@@ -3,26 +3,27 @@
 namespace Schnittstabil\Psr\Middleware;
 
 use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\RequestInterface;
-use Interop\Http\Middleware\DelegateInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Interop\Http\Middleware\RequestHandlerInterface;
+use Interop\Http\Middleware\ServerMiddlewareInterface;
 
-class Stack implements DelegateInterface
+class Stack implements RequestHandlerInterface
 {
     /**
-     * @var callable|DelegateInterface
+     * @var callable|RequestHandlerInterface
      */
     protected $core;
 
     /**
-     * @var callable[]|ServerMiddlewareInterface[]
+     * @var ServerMiddlewareInterface[]
      */
     protected $middlewares;
 
     /**
      * Constructs an onion style PSR-15 middleware stack.
      *
-     * @param callable|DelegateInterface             $core        the innermost delegate
-     * @param callable[]|ServerMiddlewareInterface[] $middlewares the middlewares to wrap around the core
+     * @param callable|RequestHandlerInterface       $core        the innermost request handler
+     * @param (callable|ServerMiddlewareInterface)[] $middlewares the middlewares to wrap around the core
      */
     public function __construct(callable $core, callable ...$middlewares)
     {
@@ -33,7 +34,7 @@ class Stack implements DelegateInterface
     /**
      * {@inheritdoc}
      */
-    public function __invoke(RequestInterface $request):ResponseInterface
+    public function __invoke(ServerRequestInterface $request):ResponseInterface
     {
         if (count($this->middlewares) === 0) {
             $core = $this->core;

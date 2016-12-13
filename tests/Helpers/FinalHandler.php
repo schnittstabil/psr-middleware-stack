@@ -3,10 +3,10 @@
 namespace Schnittstabil\Psr\Middleware\Helpers;
 
 use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\RequestInterface;
-use Interop\Http\Middleware\DelegateInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Interop\Http\Middleware\RequestHandlerInterface;
 
-class FinalHandler implements DelegateInterface
+class FinalHandler implements RequestHandlerInterface
 {
     protected $body;
 
@@ -18,7 +18,7 @@ class FinalHandler implements DelegateInterface
     /**
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function __invoke(RequestInterface $request):ResponseInterface
+    public function __invoke(ServerRequestInterface $request):ResponseInterface
     {
         return new Response($this->body);
     }

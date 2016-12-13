@@ -4,6 +4,7 @@ namespace Schnittstabil\Psr\Middleware\Helpers;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Interop\Http\Middleware\RequestHandlerInterface;
 use Interop\Http\Middleware\ServerMiddlewareInterface;
 
 class CounterMiddleware implements ServerMiddlewareInterface
@@ -15,9 +16,9 @@ class CounterMiddleware implements ServerMiddlewareInterface
         $this->index = $index;
     }
 
-    public function __invoke(ServerRequestInterface $request, callable $delegate):ResponseInterface
+    public function __invoke(ServerRequestInterface $request, RequestHandlerInterface $next):ResponseInterface
     {
-        $response = $delegate($request);
+        $response = $next($request);
         $response->getBody()->write((string) $this->index++);
 
         return $response;

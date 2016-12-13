@@ -11,6 +11,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Zend\Diactoros\ServerRequest;
+use Interop\Http\Middleware\RequestHandlerInterface;
 
 class StackTest extends \PHPUnit_Framework_TestCase
 {
@@ -99,10 +100,10 @@ class StackTest extends \PHPUnit_Framework_TestCase
     public function testCallbackMiddelwareShouldBeValid()
     {
         $finalHandler = new FinalHandler('Final!');
-        $middleware = function (ServerRequestInterface $request, callable $delegate) {
+        $middleware = function (ServerRequestInterface $request, RequestHandlerInterface $next) {
             static $index = 0;
 
-            $response = $delegate($request);
+            $response = $next($request);
             $response->getBody()->write((string) $index++);
 
             return $response;
@@ -121,9 +122,9 @@ class StackTest extends \PHPUnit_Framework_TestCase
             throw new Exception('Oops, something went wrong!', 500);
         };
         $middlewares = [
-            function (ServerRequestInterface $request, callable $delegate) {
+            function (ServerRequestInterface $request, RequestHandlerInterface $next) {
                 try {
-                    $response = $delegate($request);
+                    $response = $next($request);
                 } catch (Exception $e) {
                     return new Response('Catched: '.$e->getMessage(), $e->getCode());
                 }
@@ -142,13 +143,13 @@ class StackTest extends \PHPUnit_Framework_TestCase
     {
         $finalHandler = new FinalHandler('Final!');
         $middlewares = [
-            function (ServerRequestInterface $request, callable $delegate) {
-                $response = $delegate($request);
+            function (ServerRequestInterface $request, RequestHandlerInterface $next) {
+                $response = $next($request);
                 throw new Exception('Oops, something went wrong!', 500);
             },
-            function (ServerRequestInterface $request, callable $delegate) {
+            function (ServerRequestInterface $request, RequestHandlerInterface $next) {
                 try {
-                    $response = $delegate($request);
+                    $response = $next($request);
                 } catch (Exception $e) {
                     return new Response('Catched: '.$e->getMessage(), $e->getCode());
                 }
@@ -169,8 +170,8 @@ class StackTest extends \PHPUnit_Framework_TestCase
             throw new Exception('Oops, something went wrong!', 500);
         };
         $middlewares = [
-            function (ServerRequestInterface $request, callable $delegate) {
-                $response = $delegate($request);
+            function (ServerRequestInterface $request, RequestHandlerInterface $next) {
+                $response = $next($request);
 
                 return $response;
             },
@@ -187,12 +188,12 @@ class StackTest extends \PHPUnit_Framework_TestCase
     {
         $finalHandler = new FinalHandler('Final!');
         $middlewares = [
-            function (ServerRequestInterface $request, callable $delegate) {
-                $response = $delegate($request);
+            function (ServerRequestInterface $request, RequestHandlerInterface $next) {
+                $response = $next($request);
                 throw new Exception('Oops, something went wrong!', 500);
             },
-            function (ServerRequestInterface $request, callable $delegate) {
-                return $delegate($request);
+            function (ServerRequestInterface $request, RequestHandlerInterface $next) {
+                return $next($request);
             },
         ];
 
