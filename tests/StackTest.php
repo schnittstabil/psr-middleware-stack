@@ -8,9 +8,10 @@ use Schnittstabil\Psr\Middleware\Helpers\FinalHandler;
 use Schnittstabil\Psr\Middleware\Helpers\Response;
 use Schnittstabil\Psr\Middleware\Helpers\MultiDelegationMiddleware;
 use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Zend\Diactoros\ServerRequest;
+use Interop\Http\ServerMiddleware\DelegateInterface;
+use Interop\Http\ServerMiddleware\MiddlewareInterface;
 
 class StackTest extends \PHPUnit_Framework_TestCase
 {
@@ -21,7 +22,7 @@ class StackTest extends \PHPUnit_Framework_TestCase
         $finalHandler = new FinalHandler('Final!');
 
         $sut = new Stack($finalHandler);
-        $response = $sut(new ServerRequest());
+        $response = $sut->process(new ServerRequest());
 
         $this->assertInstanceOf(ResponseInterface::class, $response);
         $this->assertSame('Final!', (string) $response->getBody());
@@ -33,7 +34,7 @@ class StackTest extends \PHPUnit_Framework_TestCase
         $middleware = new CounterMiddleware(0);
 
         $sut = new Stack($finalHandler, $middleware);
-        $response = $sut(new ServerRequest());
+        $response = $sut->process(new ServerRequest());
 
         $this->assertInstanceOf(ResponseInterface::class, $response);
         $this->assertSame('Final!0', (string) $response->getBody());
@@ -46,7 +47,7 @@ class StackTest extends \PHPUnit_Framework_TestCase
         $middleware9 = new CounterMiddleware(9);
 
         $sut = new Stack($finalHandler, $middleware0, $middleware9);
-        $response = $sut(new ServerRequest());
+        $response = $sut->process(new ServerRequest());
 
         $this->assertInstanceOf(ResponseInterface::class, $response);
         $this->assertSame('Final!09', (string) $response->getBody());
@@ -58,7 +59,7 @@ class StackTest extends \PHPUnit_Framework_TestCase
         $middleware = new CounterMiddleware(0);
 
         $sut = new Stack($finalHandler, $middleware, $middleware);
-        $response = $sut(new ServerRequest());
+        $response = $sut->process(new ServerRequest());
 
         $this->assertInstanceOf(ResponseInterface::class, $response);
         $this->assertSame('Final!01', (string) $response->getBody());
@@ -75,7 +76,7 @@ class StackTest extends \PHPUnit_Framework_TestCase
         ];
 
         $sut = new Stack($finalHandler, ...$middlewares);
-        $response = $sut(new ServerRequest());
+        $response = $sut->process(new ServerRequest());
 
         $this->assertInstanceOf(ResponseInterface::class, $response);
         $this->assertSame('Final!0123', (string) $response->getBody());
@@ -90,7 +91,7 @@ class StackTest extends \PHPUnit_Framework_TestCase
         ];
 
         $sut = new Stack($finalHandler, ...$middlewares);
-        $response = $sut(new ServerRequest());
+        $response = $sut->process(new ServerRequest());
 
         $this->assertInstanceOf(ResponseInterface::class, $response);
         $this->assertSame('Final!42', (string) $response->getBody());
@@ -99,17 +100,20 @@ class StackTest extends \PHPUnit_Framework_TestCase
     public function testCallbackMiddelwareShouldBeValid()
     {
         $finalHandler = new FinalHandler('Final!');
-        $middleware = function (ServerRequestInterface $request, callable $delegate) {
-            static $index = 0;
+        $middleware = new class() implements MiddlewareInterface {
+            function process(ServerRequestInterface $request, DelegateInterface $delegate)
+            {
+                static $index = 0;
 
-            $response = $delegate($request);
-            $response->getBody()->write((string) $index++);
+                $response = $delegate->process($request);
+                $response->getBody()->write((string) $index++);
 
-            return $response;
+                return $response;
+            }
         };
 
         $sut = new Stack($finalHandler, $middleware);
-        $response = $sut(new ServerRequest());
+        $response = $sut->process(new ServerRequest());
 
         $this->assertInstanceOf(ResponseInterface::class, $response);
         $this->assertSame('Final!0', (string) $response->getBody());
@@ -117,21 +121,27 @@ class StackTest extends \PHPUnit_Framework_TestCase
 
     public function testMiddlewaresCanHandleCoreExceptions()
     {
-        $finalHandler = function (RequestInterface $request):ResponseInterface {
-            throw new Exception('Oops, something went wrong!', 500);
+        $finalHandler = new class() implements DelegateInterface {
+            function process(ServerRequestInterface $request):ResponseInterface
+            {
+                throw new Exception('Oops, something went wrong!', 500);
+            }
         };
         $middlewares = [
-            function (ServerRequestInterface $request, callable $delegate) {
-                try {
-                    $response = $delegate($request);
-                } catch (Exception $e) {
-                    return new Response('Catched: '.$e->getMessage(), $e->getCode());
+            new class() implements MiddlewareInterface {
+                function process(ServerRequestInterface $request, DelegateInterface $delegate)
+                {
+                    try {
+                        $response = $delegate->process($request);
+                    } catch (Exception $e) {
+                        return new Response('Catched: '.$e->getMessage(), $e->getCode());
+                    }
                 }
             },
         ];
 
         $sut = new Stack($finalHandler, ...$middlewares);
-        $response = $sut(new ServerRequest());
+        $response = $sut->process(new ServerRequest());
 
         $this->assertInstanceOf(ResponseInterface::class, $response);
         $this->assertSame('Catched: Oops, something went wrong!', (string) $response->getBody());
@@ -142,21 +152,27 @@ class StackTest extends \PHPUnit_Framework_TestCase
     {
         $finalHandler = new FinalHandler('Final!');
         $middlewares = [
-            function (ServerRequestInterface $request, callable $delegate) {
-                $response = $delegate($request);
-                throw new Exception('Oops, something went wrong!', 500);
+            new class() implements MiddlewareInterface {
+                function process(ServerRequestInterface $request, DelegateInterface $delegate)
+                {
+                    $response = $delegate->process($request);
+                    throw new Exception('Oops, something went wrong!', 500);
+                }
             },
-            function (ServerRequestInterface $request, callable $delegate) {
-                try {
-                    $response = $delegate($request);
-                } catch (Exception $e) {
-                    return new Response('Catched: '.$e->getMessage(), $e->getCode());
+            new class() implements MiddlewareInterface {
+                function process(ServerRequestInterface $request, DelegateInterface $delegate)
+                {
+                    try {
+                        $response = $delegate->process($request);
+                    } catch (Exception $e) {
+                        return new Response('Catched: '.$e->getMessage(), $e->getCode());
+                    }
                 }
             },
         ];
 
         $sut = new Stack($finalHandler, ...$middlewares);
-        $response = $sut(new ServerRequest());
+        $response = $sut->process(new ServerRequest());
 
         $this->assertInstanceOf(ResponseInterface::class, $response);
         $this->assertSame('Catched: Oops, something went wrong!', (string) $response->getBody());
@@ -165,21 +181,27 @@ class StackTest extends \PHPUnit_Framework_TestCase
 
     public function testMiddlewareCallerHaveToHandleCoreExceptions()
     {
-        $finalHandler = function (ServerRequestInterface $request):ResponseInterface {
-            throw new Exception('Oops, something went wrong!', 500);
+        $finalHandler = new class() implements DelegateInterface {
+            function process(ServerRequestInterface $request):ResponseInterface
+            {
+                throw new Exception('Oops, something went wrong!', 500);
+            }
         };
         $middlewares = [
-            function (ServerRequestInterface $request, callable $delegate) {
-                $response = $delegate($request);
+            new class() implements MiddlewareInterface {
+                function process(ServerRequestInterface $request, DelegateInterface $delegate)
+                {
+                    $response = $delegate->process($request);
 
-                return $response;
+                    return $response;
+                }
             },
         ];
 
         $sut = new Stack($finalHandler, ...$middlewares);
 
         $this->assertException(function () use ($sut) {
-            $sut(new ServerRequest());
+            $sut->process(new ServerRequest());
         }, Exception::class, 500, 'Oops, something went wrong!');
     }
 
@@ -187,19 +209,25 @@ class StackTest extends \PHPUnit_Framework_TestCase
     {
         $finalHandler = new FinalHandler('Final!');
         $middlewares = [
-            function (ServerRequestInterface $request, callable $delegate) {
-                $response = $delegate($request);
-                throw new Exception('Oops, something went wrong!', 500);
+            new class() implements MiddlewareInterface {
+                function process(ServerRequestInterface $request, DelegateInterface $delegate)
+                {
+                    $response = $delegate->process($request);
+                    throw new Exception('Oops, something went wrong!', 500);
+                }
             },
-            function (ServerRequestInterface $request, callable $delegate) {
-                return $delegate($request);
+            new class() implements MiddlewareInterface {
+                function process(ServerRequestInterface $request, DelegateInterface $delegate)
+                {
+                    return $delegate->process($request);
+                }
             },
         ];
 
         $sut = new Stack($finalHandler, ...$middlewares);
 
         $this->assertException(function () use ($sut) {
-            $sut(new ServerRequest());
+            $sut->process(new ServerRequest());
         }, Exception::class, 500, 'Oops, something went wrong!');
     }
 }

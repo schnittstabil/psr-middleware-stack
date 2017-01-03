@@ -3,47 +3,57 @@
 namespace Schnittstabil\Psr\Middleware;
 
 use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\RequestInterface;
-use Interop\Http\Middleware\DelegateInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Interop\Http\ServerMiddleware\DelegateInterface;
+use Interop\Http\ServerMiddleware\MiddlewareInterface;
 
 class Stack implements DelegateInterface
 {
     /**
-     * @var callable|DelegateInterface
+     * @var int
+     */
+    protected $index;
+
+    /**
+     * @var DelegateInterface
      */
     protected $core;
 
     /**
-     * @var callable[]|ServerMiddlewareInterface[]
+     * @var MiddlewareInterface[]
      */
     protected $middlewares;
 
     /**
      * Constructs an onion style PSR-15 middleware stack.
      *
-     * @param callable|DelegateInterface             $core        the innermost delegate
-     * @param callable[]|ServerMiddlewareInterface[] $middlewares the middlewares to wrap around the core
+     * @param DelegateInterface     $core        the innermost delegate
+     * @param MiddlewareInterface[] $middlewares the middlewares to wrap around the core
      */
-    public function __construct(callable $core, callable ...$middlewares)
+    public function __construct(DelegateInterface $core, MiddlewareInterface ...$middlewares)
     {
         $this->core = $core;
         $this->middlewares = $middlewares;
+        $this->index = count($middlewares);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function __invoke(RequestInterface $request):ResponseInterface
+    public function process(ServerRequestInterface $request):ResponseInterface
     {
-        if (count($this->middlewares) === 0) {
-            $core = $this->core;
-
-            return $core($request);
+        if ($this->index === 0) {
+            return $this->core->process($request);
         }
 
-        $copy = clone $this;
-        $topMiddleware = array_pop($copy->middlewares);
+        --$this->index;
 
-        return $topMiddleware($request, $copy);
+        try {
+            $topMiddleware = $this->middlewares[$this->index];
+
+            return $topMiddleware->process($request, $this);
+        } finally {
+            ++$this->index;
+        }
     }
 }

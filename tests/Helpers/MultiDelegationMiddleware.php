@@ -4,9 +4,10 @@ namespace Schnittstabil\Psr\Middleware\Helpers;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Interop\Http\Middleware\ServerMiddlewareInterface;
+use Interop\Http\ServerMiddleware\DelegateInterface;
+use Interop\Http\ServerMiddleware\MiddlewareInterface;
 
-class MultiDelegationMiddleware implements ServerMiddlewareInterface
+class MultiDelegationMiddleware implements MiddlewareInterface
 {
     protected $count;
 
@@ -15,10 +16,10 @@ class MultiDelegationMiddleware implements ServerMiddlewareInterface
         $this->count = $count;
     }
 
-    public function __invoke(ServerRequestInterface $request, callable $delegate):ResponseInterface
+    public function process(ServerRequestInterface $request, DelegateInterface $delegate):ResponseInterface
     {
         for ($i = 0; $i < $this->count; ++$i) {
-            $response = $delegate($request);
+            $response = $delegate->process($request);
         }
 
         return $response;

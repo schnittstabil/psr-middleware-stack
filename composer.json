@@ -25,7 +25,7 @@
     "require": {
         "php": ">=7",
         "psr/http-message": "^1.0",
-        "http-interop/http-middleware": "dev-callable#callable"
+        "http-interop/http-middleware": "^0.4.0"
     },
     "require-dev": {
         "sugared-rim/phpunit": "^2.0",
@@ -42,12 +42,10 @@
             "sugared-rim-cs"
         ],
         "test": [
-            "tests/usage.php",
             "sugared-rim-phpunit",
             "composer lint"
         ],
         "travis": [
-            "tests/usage.php",
             "sugared-rim-phpunit"
         ]
     }
